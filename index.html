@@ -144,7 +144,7 @@
   .name-entry{display:flex;align-items:center;gap:10px;padding:7px 0;}
   .name-entry:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.06);}
   .name-idx{font-size:12px;color:var(--text-dim);width:16px;flex-shrink:0;}
-  .name-text{font-family:'Noto Sans KR',sans-serif;font-weight:300;font-size:22px;letter-spacing:2px;}
+  .name-text{font-family:'Noto Sans KR',sans-serif;font-weight:300;font-size:22px;letter-spacing:0;}
   .male-col .name-text{color:#D4E8FF;}
   .female-col .name-text{color:#F5D8E8;}
   .empty-msg{padding:32px;text-align:center;font-size:14px;letter-spacing:2px;color:var(--text-dim);}
@@ -322,7 +322,7 @@
       </div>
       <div class="btn-row">
         <button class="btn btn-red" onclick="addRow()">+ 참여자 추가</button>
-        <button class="btn" onclick="loadSample()">샘플 데이터</button>
+        <button class="btn" onclick="loadDefaultData()" style="border-color:var(--border-red);color:#C04040;">기본 명단 불러오기</button>
         <button class="btn" onclick="clearParticipants()" style="margin-left:auto">참여자 초기화</button>
       </div>
     </div>
@@ -393,12 +393,45 @@ const SCRIPT_OFFSETS = (() => {
   return ANIM_SCRIPT.map(e => { const o = acc/total; acc += e[2]; return o; });
 })();
 
+// ── 기본 데이터 (최초 로드 시 자동 입력) ──
+const DEFAULT_PARTICIPANTS = [
+  {name:'곽인범', gender:'M'}, {name:'김재헌', gender:'M'}, {name:'김주호', gender:'M'},
+  {name:'김현화', gender:'F'}, {name:'김형신', gender:'M'}, {name:'박재영', gender:'M'},
+  {name:'서병희', gender:'M'}, {name:'손윤정', gender:'F'}, {name:'이현구', gender:'M'},
+  {name:'임성남', gender:'M'}, {name:'임지숙', gender:'F'}, {name:'장신우', gender:'M'},
+  {name:'정신섭', gender:'M'}, {name:'정지열', gender:'M'}, {name:'조성민', gender:'M'},
+  {name:'조정현', gender:'M'}, {name:'진성열', gender:'M'}, {name:'홍수오', gender:'F'},
+];
+const DEFAULT_ROOMS_M = ['310호','311호','312호','313호','314호','315호','316호'];
+const DEFAULT_ROOMS_F = ['416호','417호'];
+
 // ── INIT ──
 window.addEventListener('DOMContentLoaded', () => {
   loadRoomsFromStorage();
   loadParticipantsFromStorage();
   updateStats();
 });
+
+// ── 기본 데이터 불러오기 (버튼) ──
+function loadDefaultData() {
+  if (!confirm('기본 명단과 호실 정보를 불러옵니다.\n현재 입력된 데이터는 초기화됩니다. 계속하시겠습니까?')) return;
+
+  // 참여자
+  document.getElementById('tbody').innerHTML = '';
+  DEFAULT_PARTICIPANTS.forEach(p => addRow(p.name, p.gender, false));
+  renum();
+  saveParticipantsToStorage();
+
+  // 호실 — 양쪽 탭 모두
+  document.getElementById('rooms-grid-M').innerHTML = '';
+  document.getElementById('rooms-grid-F').innerHTML = '';
+  DEFAULT_ROOMS_M.forEach(n => addRoom('M', n));
+  DEFAULT_ROOMS_F.forEach(n => addRoom('F', n));
+  saveRoomsToStorage();
+
+  updateStats();
+  checkRoomWarning();
+}
 
 // ── PANEL TOGGLE ──
 function toggle(panelId, toggleId) {
@@ -622,6 +655,7 @@ function startMatch() {
 
     if(prog>=1){
       stopAudio();
+      playCompletionChime();
       // 배정 완료 메시지 잠깐 유지 후 커튼 시퀀스
       setTimeout(()=>{
         overlay.classList.remove('on');
@@ -677,17 +711,19 @@ function showCurtainThenResults(males, females) {
 
   // 5. 커튼 열림 — 4.4s, 더 느리고 무겁게. 천이 양쪽으로 당겨지며 흘러가는 느낌
   setTimeout(() => {
+    playCurtainSound();
     left.style.transition  = 'transform 2.2s cubic-bezier(0.6, 0.0, 0.4, 1.0)';
     right.style.transition = 'transform 2.2s cubic-bezier(0.6, 0.0, 0.4, 1.0)';
     left.style.transform  = 'translateX(-100%)';
     right.style.transform = 'translateX(100%)';
   }, 4400);
 
-  // 6. 커튼 완전히 숨김 — 6.8s
+  // 6. 커튼 완전히 숨김 — 6.8s + 잔잔한 BGM 시작
   setTimeout(() => {
     curtain.classList.remove('active');
     left.style.transition = 'none';
     right.style.transition = 'none';
+    playAmbientBGM(); // 커튼 열린 후 잔잔한 BGM
   }, 6800);
 }
 
@@ -759,83 +795,244 @@ function playCardAudio() {
   audioStopped = false;
   const ac = getAudioCtx();
   if (ac.state === 'suspended') ac.resume();
+  const now = ac.currentTime;
+  function add(n) { audioNodes.push(n); return n; }
 
-  const masterGain = ac.createGain();
-  masterGain.gain.value = 0.55;
-  masterGain.connect(ac.destination);
-
-  // Single card-flip sound: short filtered noise burst with fast decay
-  function cardFlip(t) {
+  // 계산기 버튼 소리 — 딱딱한 플라스틱 클릭
+  function calcClick(t, vol) {
     if (audioStopped) return;
-    const bufLen = Math.floor(ac.sampleRate * 0.022);
-    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
-    const data = buf.getChannelData(0);
-    for (let i = 0; i < bufLen; i++) {
-      // two layers: snap transient + paper body
-      const snap = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.04));
-      const paper = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.55)) * 0.35;
-      data[i] = snap + paper;
-    }
 
-    const src = ac.createBufferSource();
-    src.buffer = buf;
+    // 극도로 짧은 임펄스 — 플라스틱 딱
+    const len = Math.floor(ac.sampleRate * 0.004);
+    const buf = ac.createBuffer(1, len, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < len; i++)
+      d[i] = (i === 0 ? 1.0 : Math.random() * 2 - 1) * Math.exp(-i / (len * 0.04));
+    const src = add(ac.createBufferSource()); src.buffer = buf;
 
-    // bandpass: center around card-paper frequency range
-    const bp = ac.createBiquadFilter();
-    bp.type = 'bandpass';
-    bp.frequency.value = 1800 + Math.random() * 600; // slight variation each flip
-    bp.Q.value = 1.2;
+    // 하이패스 강하게 — 저음 완전히 제거, 딱딱한 고음만
+    const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 2800;
+    const hp2 = ac.createBiquadFilter(); hp2.type = 'peaking';
+    hp2.frequency.value = 3500; hp2.gain.value = 8; hp2.Q.value = 3;
 
-    // gentle high-shelf to add crispness
-    const shelf = ac.createBiquadFilter();
-    shelf.type = 'highshelf';
-    shelf.frequency.value = 4000;
-    shelf.gain.value = 3;
-
-    const g = ac.createGain();
-    g.gain.setValueAtTime(0.9 + Math.random() * 0.2, t);
-    g.gain.exponentialRampToValueAtTime(0.001, t + 0.022);
-
-    src.connect(bp);
-    bp.connect(shelf);
-    shelf.connect(g);
-    g.connect(masterGain);
+    const g = ac.createGain(); g.gain.value = vol * 1.8;
+    src.connect(hp); hp.connect(hp2); hp2.connect(g); g.connect(ac.destination);
     src.start(t);
-    audioNodes.push(src);
   }
 
-  // Steady shuffle rhythm — 10 seconds, consistent pace like dealing cards
-  // ~5 cards/sec, slight human timing variation per card
-  const totalDur = 10.5;
-  const baseInterval = 0.19; // ~5 flips/sec
-  let t = ac.currentTime + 0.15;
-  const end = ac.currentTime + totalDur;
-
+  // 10초간 계산기 두드리기
+  // 불규칙한 타이밍 — 실제로 계산하는 것처럼
+  let t = now + 0.2;
+  const end = now + 9.8;
   while (t < end) {
-    cardFlip(t);
-    // small human-feel timing jitter (±15ms), NO acceleration
-    t += baseInterval + (Math.random() * 0.03 - 0.015);
+    calcClick(t, 0.5 + Math.random() * 0.3);
+    // 가끔 연속으로 빠르게 (숫자 여러 개 입력)
+    if (Math.random() < 0.25) {
+      calcClick(t + 0.08, 0.4 + Math.random() * 0.2);
+      if (Math.random() < 0.4)
+        calcClick(t + 0.16, 0.35 + Math.random() * 0.2);
+    }
+    t += 0.28 + Math.random() * 0.35;
   }
-
-  // Soft final chime at the very end
-  const chimeT = ac.currentTime + 9.6;
-  const osc = ac.createOscillator();
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(1047, chimeT); // C6
-  osc.frequency.setValueAtTime(1319, chimeT + 0.12); // E6
-  osc.frequency.setValueAtTime(1568, chimeT + 0.24); // G6
-  const chimeG = ac.createGain();
-  chimeG.gain.setValueAtTime(0, chimeT);
-  chimeG.gain.linearRampToValueAtTime(0.18, chimeT + 0.03);
-  chimeG.gain.exponentialRampToValueAtTime(0.001, chimeT + 0.9);
-  osc.connect(chimeG);
-  chimeG.connect(ac.destination);
-  osc.start(chimeT);
-  osc.stop(chimeT + 1.0);
-  audioNodes.push(osc);
 }
 
-// ── SAVE IMAGE (fixed) ──
+// ── 배정 완료 뾰로롱 (커튼 직전) ──
+function playCompletionChime() {
+  const ac = getAudioCtx();
+  if (ac.state === 'suspended') ac.resume();
+  const now = ac.currentTime;
+
+  // 상승 아르페지오 — 띠리리링 느낌
+  const notes = [523, 659, 784, 1047, 1319]; // C5 E5 G5 C6 E6
+  notes.forEach((freq, i) => {
+    const o = ac.createOscillator(); o.type = 'sine';
+    o.frequency.value = freq;
+    const o2 = ac.createOscillator(); o2.type = 'sine';
+    o2.frequency.value = freq * 2.756;
+    const t = now + i * 0.1;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, t);
+    g.gain.linearRampToValueAtTime(0.18 - i * 0.01, t + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 1.2);
+    const g2 = ac.createGain();
+    g2.gain.setValueAtTime(0, t);
+    g2.gain.linearRampToValueAtTime(0.05, t + 0.01);
+    g2.gain.exponentialRampToValueAtTime(0.001, t + 0.6);
+    o.connect(g); g.connect(ac.destination);
+    o2.connect(g2); g2.connect(ac.destination);
+    o.start(t); o.stop(t + 1.3);
+    o2.start(t); o2.stop(t + 0.7);
+  });
+}
+
+// ── 커튼 사운드 ──
+function playCurtainSound() {
+  const ac = getAudioCtx();
+  if (ac.state === 'suspended') ac.resume();
+  const now = ac.currentTime;
+
+  // 천 쓸리는 소리
+  const dur = 2.4;
+  const bufLen = Math.floor(ac.sampleRate * dur);
+  const buf = ac.createBuffer(2, bufLen, ac.sampleRate);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const nSrc = ac.createBufferSource(); nSrc.buffer = buf;
+  const lp = ac.createBiquadFilter(); lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(400, now);
+  lp.frequency.linearRampToValueAtTime(3200, now + 1.0);
+  lp.frequency.linearRampToValueAtTime(500, now + 2.4);
+  const hp = ac.createBiquadFilter(); hp.type = 'highpass'; hp.frequency.value = 150;
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0, now);
+  ng.gain.linearRampToValueAtTime(0.5, now + 0.1);
+  ng.gain.linearRampToValueAtTime(0.32, now + 1.2);
+  ng.gain.exponentialRampToValueAtTime(0.001, now + 2.4);
+  nSrc.connect(hp); hp.connect(lp); lp.connect(ng); ng.connect(ac.destination);
+  nSrc.start(now);
+
+  // 봉 우르릉
+  const rum = ac.createOscillator(); rum.type = 'sine';
+  rum.frequency.setValueAtTime(65, now);
+  rum.frequency.exponentialRampToValueAtTime(38, now + 1.8);
+  const rg = ac.createGain();
+  rg.gain.setValueAtTime(0, now);
+  rg.gain.linearRampToValueAtTime(0.28, now + 0.06);
+  rg.gain.exponentialRampToValueAtTime(0.001, now + 1.6);
+  rum.connect(rg); rg.connect(ac.destination);
+  rum.start(now); rum.stop(now + 1.8);
+
+  // 쿵 + 스팅어
+  const hit = now + 1.7;
+  const kick = ac.createOscillator(); kick.type = 'sine';
+  kick.frequency.setValueAtTime(130, hit);
+  kick.frequency.exponentialRampToValueAtTime(38, hit + 0.22);
+  const kg = ac.createGain();
+  kg.gain.setValueAtTime(0.75, hit);
+  kg.gain.exponentialRampToValueAtTime(0.001, hit + 0.35);
+  kick.connect(kg); kg.connect(ac.destination);
+  kick.start(hit); kick.stop(hit + 0.4);
+
+  [[220,0],[330,0.05],[440,0.10],[550,0.15],[660,0.20]].forEach(([freq, d]) => {
+    const o = ac.createOscillator(); o.type = 'triangle';
+    o.frequency.value = freq;
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0, hit + d);
+    g.gain.linearRampToValueAtTime(0.14, hit + d + 0.04);
+    g.gain.exponentialRampToValueAtTime(0.001, hit + d + 1.8);
+    o.connect(g); g.connect(ac.destination);
+    o.start(hit + d); o.stop(hit + d + 2.0);
+  });
+}
+
+// ── 잔잔한 어쿠스틱 BGM (커튼 열린 후 1분) ──
+let ambientNodes = [];
+function stopAmbientBGM() {
+  ambientNodes.forEach(n => { try { n.stop(0); } catch(e){} });
+  ambientNodes = [];
+}
+
+function playAmbientBGM() {
+  stopAmbientBGM();
+  const ac = getAudioCtx();
+  if (ac.state === 'suspended') ac.resume();
+  const now = ac.currentTime;
+  const dur = 62; // 60초 + 페이드아웃 여유
+
+  function add(n) { ambientNodes.push(n); return n; }
+
+  // 마스터 — 부드럽게 페이드인
+  const master = ac.createGain();
+  master.gain.setValueAtTime(0, now);
+  master.gain.linearRampToValueAtTime(0.55, now + 3.0);
+  master.gain.linearRampToValueAtTime(0.55, now + dur - 4.0);
+  master.gain.linearRampToValueAtTime(0, now + dur);
+  master.connect(ac.destination);
+
+  // ── 1. 따뜻한 패드 — 현악기 드론 느낌 ──
+  // C장조 기반 (C3, E3, G3, B3) — 따뜻하고 열린 화음
+  function pad(freq, vol, detune=0) {
+    const o = add(ac.createOscillator()); o.type = 'sine';
+    o.frequency.value = freq; o.detune.value = detune;
+    // 느린 비브라토
+    const lfo = add(ac.createOscillator()); lfo.type = 'sine'; lfo.frequency.value = 0.3;
+    const lfoG = ac.createGain(); lfoG.gain.value = 3;
+    lfo.connect(lfoG); lfoG.connect(o.detune);
+    const g = ac.createGain(); g.gain.value = vol;
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 800;
+    o.connect(lp); lp.connect(g); g.connect(master);
+    o.start(now); o.stop(now + dur + 0.5);
+    lfo.start(now); lfo.stop(now + dur + 0.5);
+  }
+
+  pad(130.8, 0.22);       // C3
+  pad(130.8, 0.08, 6);    // C3 약간 디튠 — 두께감
+  pad(164.8, 0.16);       // E3
+  pad(196.0, 0.18);       // G3
+  pad(246.9, 0.10);       // B3
+
+  // ── 2. 어쿠스틱 기타 느낌 — 핑거피킹 아르페지오 ──
+  // 기타 현 퉁기는 소리: 짧은 감쇠 + 하모닉
+  function pluck(t, freq, vol) {
+    // Karplus-Strong 근사 — 실제 기타 줄 울림
+    const bufLen = Math.floor(ac.sampleRate * 0.045);
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) d[i] = Math.random() * 2 - 1;
+    const src = add(ac.createBufferSource()); src.buffer = buf; src.loop = false;
+
+    const o = add(ac.createOscillator()); o.type = 'triangle';
+    o.frequency.value = freq;
+    const og = ac.createGain();
+    og.gain.setValueAtTime(vol, t);
+    og.gain.exponentialRampToValueAtTime(0.001, t + 1.6);
+
+    const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = freq * 6;
+    const ng = ac.createGain();
+    ng.gain.setValueAtTime(vol * 0.4, t);
+    ng.gain.exponentialRampToValueAtTime(0.001, t + 0.08);
+
+    src.connect(lp); lp.connect(ng); ng.connect(master);
+    o.connect(og); og.connect(master);
+    src.start(t); o.start(t); o.stop(t + 1.8);
+  }
+
+  // C장조 아르페지오 패턴 — 8마디 반복 (각 마디 4초)
+  // C-E-G-B / Am: A-C-E-G / F: F-A-C-E / G: G-B-D-F#
+  const chords = [
+    [261.6, 329.6, 392.0, 493.9], // C
+    [220.0, 261.6, 329.6, 392.0], // Am
+    [174.6, 220.0, 261.6, 329.6], // F
+    [196.0, 246.9, 293.7, 370.0], // G
+  ];
+
+  const beatLen = 0.55; // 한 음 간격
+  let t = now + 1.0;
+  for (let rep = 0; rep < 15; rep++) { // 충분히 반복
+    const chord = chords[rep % chords.length];
+    chord.forEach((freq, i) => {
+      if (t + i * beatLen < now + dur - 2) {
+        pluck(t + i * beatLen, freq, 0.12 + Math.random() * 0.04);
+        // 한 옥타브 위도 살짝
+        if (i === 0 || i === 2) pluck(t + i * beatLen, freq * 2, 0.05);
+      }
+    });
+    t += chord.length * beatLen + 0.3; // 마디 간격
+  }
+
+  // ── 3. 바람 소리 — 아주 낮게 ──
+  const windLen = Math.floor(ac.sampleRate * Math.min(dur, 60));
+  const windBuf = ac.createBuffer(1, windLen, ac.sampleRate);
+  const wd = windBuf.getChannelData(0);
+  for (let i = 0; i < windLen; i++) wd[i] = Math.random() * 2 - 1;
+  const windSrc = add(ac.createBufferSource()); windSrc.buffer = windBuf;
+  const wlp = ac.createBiquadFilter(); wlp.type = 'lowpass'; wlp.frequency.value = 320;
+  const wg = ac.createGain(); wg.gain.value = 0.04;
+  windSrc.connect(wlp); wlp.connect(wg); wg.connect(master);
+  windSrc.start(now); windSrc.stop(now + dur);
+}
 function saveImg() {
   const target = document.getElementById('results');
   const btn = document.getElementById('btn-save');
