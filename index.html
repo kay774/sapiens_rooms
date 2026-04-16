@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sapiens 2.0 — Room Assignment</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Serif+KR:wght@300;400;600&family=Bebas+Neue&family=Noto+Sans+KR:wght@300;400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+  :root {
+    --red:#8B1A1A; --red-deep:#6B1212; --red-bright:#A52020; --red-glow:rgba(139,26,26,0.25);
+    --bg:#0D0D0D; --bg2:#141414; --surface:#1A1A1A; --border:#2C2C2C;
+    --border-red:rgba(139,26,26,0.4); --text:#F0EDE8; --text-mid:#A09890; --text-dim:#5A5550;
+    --male:#6B9ED4; --female:#C4809A; --white:#FFFFFF;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Noto Sans KR',sans-serif;font-weight:300;min-height:100vh;overflow-x:hidden;}
+  .page{max-width:1200px;margin:0 auto;padding:0 40px 80px;}
+
+  /* HERO */
+  .hero{padding:64px 0 48px;text-align:center;}
+  .hero::after{content:'';display:block;width:100%;height:1px;background:linear-gradient(90deg,transparent,var(--red),transparent);margin-top:48px;}
+  .hero-program{font-family:'Bebas Neue',sans-serif;font-size:clamp(64px,12vw,120px);letter-spacing:6px;color:var(--white);line-height:0.95;}
+  .hero-program span{color:var(--red-bright);}
+  .hero-tagline{font-family:'Noto Serif KR',serif;font-weight:300;font-size:clamp(18px,3vw,28px);letter-spacing:5px;color:var(--text-mid);margin-top:20px;}
+  .hero-divider{width:40px;height:1px;background:var(--red);margin:24px auto;}
+  .hero-quote{font-family:'Noto Serif KR',serif;font-weight:300;font-size:clamp(16px,2.5vw,24px);color:var(--text-mid);letter-spacing:2px;}
+  .hero-system{font-size:11px;letter-spacing:5px;text-transform:uppercase;color:var(--text-dim);margin-top:16px;}
+
+  /* STATS */
+  .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);border:1px solid var(--border);margin:32px 0;}
+  .stat{background:var(--bg2);padding:20px 16px;text-align:center;}
+  .stat-label{font-size:9px;letter-spacing:4px;text-transform:uppercase;color:var(--text-dim);margin-bottom:8px;}
+  .stat-value{font-family:'Bebas Neue',sans-serif;font-size:38px;letter-spacing:2px;color:var(--white);line-height:1;}
+  .s-male .stat-value{color:var(--male);}
+  .s-female .stat-value{color:var(--female);}
+  .s-rooms .stat-value{color:var(--red-bright);}
+
+  /* SECTION */
+  .sec-head{display:flex;align-items:center;gap:14px;padding-bottom:12px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;margin-top:32px;margin-bottom:16px;}
+  .sec-bar{width:3px;height:16px;background:var(--red);flex-shrink:0;}
+  .sec-label{font-size:10px;letter-spacing:4px;text-transform:uppercase;color:var(--text-mid);}
+  .sec-toggle{margin-left:auto;font-size:9px;letter-spacing:2px;color:var(--text-dim);}
+  .collapsible{overflow:hidden;max-height:4000px;transition:max-height 0.4s ease;}
+  .collapsible.closed{max-height:0;}
+
+  /* ROOM MANAGEMENT */
+  .room-gender-tabs{display:flex;gap:1px;margin-bottom:16px;}
+  .room-tab{font-family:'Noto Sans KR',sans-serif;font-size:11px;font-weight:400;letter-spacing:3px;padding:10px 24px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;transition:all 0.2s;}
+  .room-tab.active-m{border-color:var(--male);color:var(--male);background:rgba(107,158,212,0.08);}
+  .room-tab.active-f{border-color:var(--female);color:var(--female);background:rgba(196,128,154,0.08);}
+  .rooms-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:12px;}
+  .room-chip{display:flex;align-items:center;gap:8px;background:var(--bg2);border:1px solid var(--border);padding:8px 12px;}
+  .room-chip-icon{font-size:10px;letter-spacing:1px;color:var(--text-dim);flex-shrink:0;}
+  .room-chip input{background:transparent;border:none;outline:none;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:300;width:100%;border-bottom:1px solid transparent;transition:border-color 0.2s;}
+  .room-chip input:focus{border-bottom-color:var(--red);}
+  .room-chip input::placeholder{color:var(--text-dim);}
+  .room-chip-del{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:12px;padding:0 2px;transition:color 0.2s;flex-shrink:0;}
+  .room-chip-del:hover{color:#CC4444;}
+  .room-btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px;}
+  .room-add-btn{font-family:'Noto Sans KR',sans-serif;font-size:11px;font-weight:400;letter-spacing:2px;padding:8px 16px;border:1px dashed var(--border);background:transparent;color:var(--text-dim);cursor:pointer;transition:all 0.2s;}
+  .room-add-btn:hover{border-color:var(--red);color:var(--red-bright);}
+  .room-reset-btn{font-family:'Noto Sans KR',sans-serif;font-size:11px;font-weight:400;letter-spacing:2px;padding:8px 16px;border:1px solid var(--border);background:transparent;color:var(--text-dim);cursor:pointer;transition:all 0.2s;}
+  .room-reset-btn:hover{border-color:#CC4444;color:#CC4444;}
+  .room-warning{margin-top:10px;padding:10px 14px;border:1px solid rgba(139,26,26,0.3);background:rgba(139,26,26,0.06);font-size:11px;letter-spacing:1px;color:#C04040;display:none;}
+
+  /* TABLE */
+  .table-wrap{overflow-x:auto;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--text-dim);text-align:left;padding:10px 12px;border-bottom:1px solid var(--border);background:var(--bg2);}
+  td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:middle;}
+  tr:hover td{background:rgba(255,255,255,0.015);}
+  tr:last-child td{border-bottom:none;}
+  td input[type="text"]{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:13px;font-weight:300;width:100%;outline:none;padding:2px 0;transition:border-color 0.2s;}
+  td input::placeholder{color:var(--text-dim);}
+  td input:focus{border-bottom-color:var(--red);}
+  .gender-select{background:var(--surface);border:1px solid var(--border);color:var(--text);font-family:'Noto Sans KR',sans-serif;font-size:12px;font-weight:300;padding:5px 10px;cursor:pointer;outline:none;border-radius:0;transition:border-color 0.2s;}
+  .gender-select:focus{border-color:var(--red);}
+  .gender-select option{background:var(--surface);}
+  .row-num{color:var(--text-dim);font-size:11px;width:28px;}
+  .btn-del{background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:13px;padding:2px 6px;transition:color 0.2s;}
+  .btn-del:hover{color:#CC4444;}
+
+  /* BUTTONS */
+  .btn-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:16px;}
+  .btn{font-family:'Noto Sans KR',sans-serif;font-size:11px;font-weight:400;letter-spacing:2px;padding:10px 20px;border:1px solid var(--border);background:transparent;color:var(--text-mid);cursor:pointer;transition:all 0.2s;}
+  .btn:hover{border-color:var(--text-dim);color:var(--text);}
+  .btn-red{border-color:var(--border-red);color:#C04040;background:rgba(139,26,26,0.06);}
+  .btn-red:hover{border-color:var(--red-bright);color:#E05050;background:rgba(139,26,26,0.12);}
+
+  /* MATCH BUTTON */
+  .match-wrap{text-align:center;padding:40px 0;position:relative;}
+  .match-wrap::before,.match-wrap::after{content:'';position:absolute;top:50%;width:calc(50% - 170px);height:1px;}
+  .match-wrap::before{left:0;background:linear-gradient(90deg,transparent,var(--border));}
+  .match-wrap::after{right:0;background:linear-gradient(90deg,var(--border),transparent);}
+  .btn-match{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:6px;padding:18px 56px;background:var(--red-deep);border:1px solid var(--red);color:var(--white);cursor:pointer;position:relative;overflow:hidden;transition:all 0.3s;}
+  .btn-match::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.08),transparent);transition:left 0.5s;}
+  .btn-match:hover::before{left:100%;}
+  .btn-match:hover{background:var(--red-bright);box-shadow:0 0 40px var(--red-glow);}
+
+  /* ANIMATION OVERLAY */
+  #anim-overlay{display:none;position:fixed;inset:0;background:rgba(10,10,10,0.98);z-index:200;align-items:center;justify-content:center;flex-direction:column;gap:28px;}
+  #anim-overlay.on{display:flex;}
+  .anim-eyebrow{font-size:11px;letter-spacing:6px;text-transform:uppercase;color:var(--text-dim);}
+  .anim-big{font-family:'Black Han Sans',sans-serif;font-size:clamp(36px,6vw,72px);letter-spacing:4px;color:var(--white);text-align:center;line-height:1.1;min-height:80px;display:flex;align-items:center;justify-content:center;transition:opacity 0.25s;white-space:nowrap;}
+  .anim-msg{font-family:'Noto Serif KR',serif;font-weight:300;font-size:clamp(16px,2.4vw,24px);color:var(--text-mid);text-align:center;letter-spacing:1px;min-height:36px;max-width:700px;line-height:2.0;transition:opacity 0.25s;padding:0 32px;word-break:keep-all;}
+  .ticker-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;width:min(600px,88vw);}
+  .tc{border:1px solid var(--border);padding:10px 6px;text-align:center;font-size:14px;font-weight:300;color:var(--text-dim);min-height:40px;display:flex;align-items:center;justify-content:center;transition:all 0.1s;}
+  .tc.lit{border-color:var(--red);color:var(--white);background:rgba(139,26,26,0.2);}
+  .anim-bar-wrap{width:min(600px,88vw);height:2px;background:var(--border);}
+  .anim-bar{height:100%;background:var(--red);width:0%;}
+  .anim-pct{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:3px;color:var(--text-dim);}
+
+  /* RESULTS */
+  #results{display:none;margin-top:8px;}
+  .result-header{text-align:center;padding:32px 0 24px;border-top:1px solid var(--border);}
+  .result-main-title{font-family:'Bebas Neue',sans-serif;font-size:clamp(36px,6vw,64px);letter-spacing:8px;color:var(--white);margin-bottom:8px;}
+  .result-main-sub{font-family:'Noto Serif KR',serif;font-weight:300;font-size:14px;letter-spacing:4px;color:var(--text-dim);margin-bottom:4px;}
+  .result-quote{font-family:'Noto Serif KR',serif;font-weight:300;font-size:15px;letter-spacing:1px;color:var(--text-mid);margin-top:12px;}
+  .result-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:32px;}
+  @media(max-width:580px){.result-cols,.stats-row{grid-template-columns:1fr 1fr;}.ticker-grid{grid-template-columns:repeat(4,1fr);}}
+  .result-col{border:1px solid var(--border);background:var(--bg2);overflow:hidden;}
+  .rcol-head{padding:16px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;}
+  .rcol-bar{width:4px;height:22px;flex-shrink:0;}
+  .rcol-label{font-size:12px;letter-spacing:4px;text-transform:uppercase;}
+  .rcol-count{margin-left:auto;font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:2px;}
+  .male-col .result-col{border-top:3px solid var(--male);}
+  .male-col .rcol-bar{background:var(--male);}
+  .male-col .rcol-label{color:var(--male);}
+  .male-col .rcol-count{color:var(--male);}
+  .female-col .result-col{border-top:3px solid var(--female);}
+  .female-col .rcol-bar{background:var(--female);}
+  .female-col .rcol-label{color:var(--female);}
+  .female-col .rcol-count{color:var(--female);}
+  .rooms-result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:var(--border);}
+  .room-item{padding:18px 20px;background:var(--bg2);transition:background 0.15s;}
+  .room-item:hover{background:rgba(255,255,255,0.03);}
+  .room-tag{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .room-num-lbl{font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:3px;color:var(--white);}
+  .single-badge{font-size:10px;letter-spacing:1px;padding:2px 7px;border:1px solid var(--border-red);color:var(--red-bright);background:rgba(139,26,26,0.08);}
+  .overflow-badge{font-size:10px;letter-spacing:1px;padding:2px 7px;border:1px solid rgba(212,160,32,0.4);color:#D4A020;background:rgba(212,160,32,0.08);}
+  .name-entry{display:flex;align-items:center;gap:10px;padding:7px 0;}
+  .name-entry:not(:last-child){border-bottom:1px solid rgba(255,255,255,0.06);}
+  .name-idx{font-size:12px;color:var(--text-dim);width:16px;flex-shrink:0;}
+  .name-text{font-family:'Noto Serif KR',serif;font-weight:300;font-size:22px;letter-spacing:2px;}
+  .male-col .name-text{color:#D4E8FF;}
+  .female-col .name-text{color:#F5D8E8;}
+  .empty-msg{padding:32px;text-align:center;font-size:14px;letter-spacing:2px;color:var(--text-dim);}
+
+  /* SAVE */
+  .save-wrap{text-align:center;padding:32px 0;border-top:1px solid var(--border);}
+  .btn-save{font-family:'Bebas Neue',sans-serif;font-size:16px;letter-spacing:5px;padding:16px 44px;background:transparent;border:1px solid var(--border-red);color:var(--red-bright);cursor:pointer;transition:all 0.25s;}
+  .btn-save:hover{background:rgba(139,26,26,0.12);border-color:var(--red-bright);box-shadow:0 0 24px var(--red-glow);color:#E05050;}
+  .ts{margin-top:12px;font-size:10px;letter-spacing:3px;color:var(--text-dim);}
+
+  /* CURTAIN */
+  #curtain{display:none;position:fixed;inset:0;z-index:300;pointer-events:none;overflow:hidden;}
+  #curtain.active{display:block;}
+
+  .curtain-left,.curtain-right{
+    position:absolute;top:0;height:100%;width:52%;
+    will-change:transform;
+    overflow:hidden;
+  }
+  .curtain-left{left:0;transform:translateX(-100%);}
+  .curtain-right{right:0;transform:translateX(100%);}
+
+  /* 벨벳 천 — 여러 레이어 겹쳐서 깊이감 */
+  .curtain-left::before,.curtain-right::before{
+    content:'';position:absolute;inset:0;
+    background:
+      /* 실크 광택 하이라이트 */
+      linear-gradient(105deg,
+        rgba(255,255,255,0.0) 0%,
+        rgba(255,255,255,0.06) 20%,
+        rgba(255,255,255,0.0) 35%,
+        rgba(255,255,255,0.04) 55%,
+        rgba(255,255,255,0.0) 70%,
+        rgba(255,255,255,0.07) 85%,
+        rgba(255,255,255,0.0) 100%
+      ),
+      /* 벨벳 베이스 그라데이션 */
+      linear-gradient(to bottom,
+        #3D0808 0%,
+        #6B1212 15%,
+        #8B1A1A 35%,
+        #7A1515 55%,
+        #5A0E0E 75%,
+        #3D0808 100%
+      );
+  }
+
+  /* 수직 주름 — 천이 접히는 느낌 */
+  .curtain-left::after,.curtain-right::after{
+    content:'';position:absolute;inset:0;
+    background:repeating-linear-gradient(
+      90deg,
+      rgba(0,0,0,0)        0px,
+      rgba(0,0,0,0.18)     6px,
+      rgba(0,0,0,0)        12px,
+      rgba(255,255,255,0.04) 16px,
+      rgba(0,0,0,0)        20px,
+      rgba(0,0,0,0.12)     26px,
+      rgba(0,0,0,0)        34px,
+      rgba(255,255,255,0.02) 38px,
+      rgba(0,0,0,0)        44px,
+      rgba(0,0,0,0.2)      48px,
+      rgba(0,0,0,0)        56px
+    );
+  }
+
+  /* 커튼 안쪽 가장자리 — 빛이 닿는 부분 */
+  .curtain-left .curtain-inner-edge{
+    position:absolute;top:0;right:0;width:40px;height:100%;
+    background:linear-gradient(to right,
+      rgba(180,60,60,0.0) 0%,
+      rgba(200,80,80,0.25) 60%,
+      rgba(220,100,100,0.5) 100%
+    );
+    filter:blur(4px);
+  }
+  .curtain-right .curtain-inner-edge{
+    position:absolute;top:0;left:0;width:40px;height:100%;
+    background:linear-gradient(to left,
+      rgba(180,60,60,0.0) 0%,
+      rgba(200,80,80,0.25) 60%,
+      rgba(220,100,100,0.5) 100%
+    );
+    filter:blur(4px);
+  }
+
+  /* 커튼 상단 — 봉에 걸린 부분 */
+  .curtain-rod-shadow{
+    position:absolute;top:0;left:0;right:0;height:18px;
+    background:linear-gradient(to bottom,rgba(0,0,0,0.55),rgba(0,0,0,0));
+    z-index:1;
+  }
+
+  .curtain-label{
+    position:absolute;top:50%;left:50%;
+    transform:translate(-50%,-50%);
+    font-family:'Noto Serif KR',serif;font-weight:300;
+    letter-spacing:6px;
+    color:rgba(255,230,210,0.85);text-align:center;
+    white-space:nowrap;opacity:0;
+    transition:opacity 0.9s ease;
+    z-index:302;pointer-events:none;
+    text-shadow:0 2px 20px rgba(0,0,0,0.9);
+  }
+  .curtain-main{
+    display:block;
+    font-size:clamp(20px,3.5vw,36px);
+    color:rgba(255,230,210,0.92);
+    letter-spacing:6px;
+    margin-bottom:14px;
+  }
+  .curtain-sub{
+    display:block;
+    font-size:clamp(11px,1.4vw,15px);
+    color:rgba(255,210,185,0.45);
+    letter-spacing:8px;
+    text-transform:uppercase;
+  }
+  .curtain-label.show{opacity:1;}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header class="hero">
+    <div class="hero-program">SAPIENS <span>2.0</span></div>
+    <div class="hero-tagline">CEO를 위한 미래전략의 시간</div>
+    <div class="hero-divider"></div>
+    <div class="hero-quote">오늘의 룸메이트는 하루의 여운을 함께 나눌 분입니다.</div>
+    <div class="hero-system">Networking Matrix · Room Assignment System</div>
+  </header>
+
+  <div class="stats-row">
+    <div class="stat"><div class="stat-label">Total</div><div class="stat-value" id="stat-total">0</div></div>
+    <div class="stat s-male"><div class="stat-label">Male</div><div class="stat-value" id="stat-male">0</div></div>
+    <div class="stat s-female"><div class="stat-label">Female</div><div class="stat-value" id="stat-female">0</div></div>
+    <div class="stat s-rooms"><div class="stat-label">Rooms</div><div class="stat-value" id="stat-rooms">0</div></div>
+  </div>
+
+  <!-- ROOM MANAGEMENT -->
+  <div>
+    <div class="sec-head" onclick="toggle('room-panel','room-toggle')">
+      <div class="sec-bar"></div>
+      <span class="sec-label">호실 관리</span>
+      <span class="sec-toggle" id="room-toggle">▲ 접기</span>
+    </div>
+    <div class="collapsible" id="room-panel">
+      <div class="room-gender-tabs">
+        <button class="room-tab active-m" id="tab-m" onclick="switchRoomTab('M')">남성 호실</button>
+        <button class="room-tab" id="tab-f" onclick="switchRoomTab('F')">여성 호실</button>
+      </div>
+      <div id="rooms-grid-M" class="rooms-grid"></div>
+      <div id="rooms-grid-F" class="rooms-grid" style="display:none"></div>
+      <div class="room-btn-row">
+        <button class="room-add-btn" onclick="addRoom(currentRoomTab)">+ 호실 추가</button>
+        <button class="room-reset-btn" onclick="resetRooms()">현재 탭 호실 초기화</button>
+      </div>
+      <div class="room-warning" id="room-warning"></div>
+    </div>
+  </div>
+
+  <!-- PARTICIPANT INPUT -->
+  <div>
+    <div class="sec-head" onclick="toggle('input-panel','input-toggle')">
+      <div class="sec-bar"></div>
+      <span class="sec-label">참여자 명단 입력</span>
+      <span class="sec-toggle" id="input-toggle">▲ 접기</span>
+    </div>
+    <div class="collapsible" id="input-panel">
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th class="row-num">#</th><th>이름</th><th>성별</th><th></th></tr></thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-red" onclick="addRow()">+ 참여자 추가</button>
+        <button class="btn" onclick="loadSample()">샘플 데이터</button>
+        <button class="btn" onclick="clearParticipants()" style="margin-left:auto">참여자 초기화</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="match-wrap">
+    <button class="btn-match" onclick="startMatch()">알고리즘 매칭 시작</button>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results">
+    <div class="result-header">
+      <div class="result-main-title">ROOM ASSIGNMENT</div>
+      <div class="result-main-sub">배정 결과 · Sapiens 2.0 CEO 과정</div>
+      <div class="result-quote">오늘의 룸메이트는 하루의 여운을 함께 나눌 분입니다.</div>
+    </div>
+    <div class="result-cols" id="result-cols"></div>
+    <div class="save-wrap">
+      <button class="btn-save" id="btn-save" onclick="saveImg()">배정 결과 이미지로 저장</button>
+      <div class="ts" id="ts"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ANIMATION OVERLAY -->
+<div id="anim-overlay">
+  <div class="anim-eyebrow">Sapiens 2.0 · Gravity Ventures</div>
+  <div class="anim-big" id="anim-big">데이터<br>분석 중</div>
+  <div class="anim-msg" id="anim-msg">참여자 프로필을 정밀 스캔하고 있습니다.</div>
+  <div class="ticker-grid" id="ticker"></div>
+  <div class="anim-bar-wrap"><div class="anim-bar" id="anim-bar"></div></div>
+  <div class="anim-pct" id="anim-pct">0%</div>
+</div>
+
+<!-- CURTAIN -->
+<div id="curtain">
+  <div class="curtain-rod-shadow"></div>
+  <div class="curtain-left"><div class="curtain-inner-edge"></div></div>
+  <div class="curtain-right"><div class="curtain-inner-edge"></div></div>
+  <div class="curtain-label" id="curtain-label">
+    <span class="curtain-main">오늘의 룸메이트를 공개합니다.</span><br>
+    <span class="curtain-sub">Sapiens 2.0</span>
+  </div>
+</div>
+
+<script>
+const SK_P = 'sapiens2_participants';
+const SK_RM = 'sapiens2_rooms_M';
+const SK_RF = 'sapiens2_rooms_F';
+
+let currentRoomTab = 'M';
+
+// ── ANIMATION SCRIPT ──
+// [bigText, msgText, relative_weight]
+const ANIM_SCRIPT = [
+  ['데이터 분석 중',        '참여자 프로필을 정밀 스캔하고 있습니다.',               1.0],
+  ['궁금하시죠?',           '저도 솔직히 꽤 궁금합니다.',                           1.5],
+  ['조합 계산 중',          'AI가 배정해주는 랜덤 호실입니다.\n(굉장히 공정합니다.)',1.8],
+  ['최적 경로 탐색 중',     '오늘 밤 가장 좋은 대화 상대를\n찾고 있습니다.',         1.5],
+  ['거의 다 됐어요',        '마지막 검토 중입니다.\n완벽한 매칭을 위한 마지막 순간입니다.',  1.4],
+  ['잠시 후 공개됩니다',    '잠시 후 공개됩니다.\n기대하셔도 좋습니다.',             1.8],
+  ['호실 배정 완료',        '운명의 룸메이트가 결정되었습니다.',                     1.0],
+];
+const SCRIPT_OFFSETS = (() => {
+  const total = ANIM_SCRIPT.reduce((s,e) => s+e[2], 0);
+  let acc = 0;
+  return ANIM_SCRIPT.map(e => { const o = acc/total; acc += e[2]; return o; });
+})();
+
+// ── INIT ──
+window.addEventListener('DOMContentLoaded', () => {
+  loadRoomsFromStorage();
+  loadParticipantsFromStorage();
+  updateStats();
+});
+
+// ── PANEL TOGGLE ──
+function toggle(panelId, toggleId) {
+  const panel = document.getElementById(panelId);
+  const t = document.getElementById(toggleId);
+  const closed = panel.classList.toggle('closed');
+  t.textContent = closed ? '▼ 펼치기' : '▲ 접기';
+}
+
+// ── ROOM TAB ──
+function switchRoomTab(g) {
+  currentRoomTab = g;
+  document.getElementById('rooms-grid-M').style.display = g==='M' ? 'grid' : 'none';
+  document.getElementById('rooms-grid-F').style.display = g==='F' ? 'grid' : 'none';
+  document.getElementById('tab-m').className = 'room-tab' + (g==='M' ? ' active-m' : '');
+  document.getElementById('tab-f').className = 'room-tab' + (g==='F' ? ' active-f' : '');
+}
+
+// ── ROOM CRUD ──
+function addRoom(g, name='') {
+  const grid = document.getElementById('rooms-grid-'+g);
+  const chip = document.createElement('div');
+  chip.className = 'room-chip';
+  chip.innerHTML = `
+    <span class="room-chip-icon">${g==='M'?'♂':'♀'}</span>
+    <input type="text" placeholder="호실명 (예: 201호)" value="${name}" oninput="saveRoomsToStorage();checkRoomWarning()">
+    <button class="room-chip-del" onclick="this.closest('.room-chip').remove();saveRoomsToStorage();checkRoomWarning()">✕</button>
+  `;
+  grid.appendChild(chip);
+  saveRoomsToStorage();
+  checkRoomWarning();
+}
+
+function resetRooms() {
+  const g = currentRoomTab;
+  if (!confirm(`${g==='M'?'남성':'여성'} 호실을 모두 초기화하시겠습니까?`)) return;
+  document.getElementById('rooms-grid-'+g).innerHTML = '';
+  saveRoomsToStorage();
+  checkRoomWarning();
+  updateStats();
+}
+
+function getRoomNames(g) {
+  return [...document.querySelectorAll('#rooms-grid-'+g+' .room-chip input')]
+    .map(i => i.value.trim()).filter(Boolean);
+}
+
+function checkRoomWarning() {
+  const warnEl = document.getElementById('room-warning');
+  const mR = getRoomNames('M'), fR = getRoomNames('F');
+  const m = getPeople().filter(p=>p.gender==='M').length;
+  const f = getPeople().filter(p=>p.gender==='F').length;
+  const warns = [];
+  if (mR.length>0 && Math.ceil(m/2)>mR.length) warns.push(`남성 호실 부족 (${m}명 → ${Math.ceil(m/2)}개 필요, 현재 ${mR.length}개)`);
+  if (fR.length>0 && Math.ceil(f/2)>fR.length) warns.push(`여성 호실 부족 (${f}명 → ${Math.ceil(f/2)}개 필요, 현재 ${fR.length}개)`);
+  warnEl.style.display = warns.length ? 'block' : 'none';
+  warnEl.textContent = warns.join(' / ');
+}
+
+// ── ROOM STORAGE ──
+function saveRoomsToStorage() {
+  try {
+    localStorage.setItem(SK_RM, JSON.stringify([...document.querySelectorAll('#rooms-grid-M .room-chip input')].map(i=>i.value.trim())));
+    localStorage.setItem(SK_RF, JSON.stringify([...document.querySelectorAll('#rooms-grid-F .room-chip input')].map(i=>i.value.trim())));
+  } catch(e){}
+}
+function loadRoomsFromStorage() {
+  try {
+    JSON.parse(localStorage.getItem(SK_RM)||'[]').forEach(n=>addRoom('M',n));
+    JSON.parse(localStorage.getItem(SK_RF)||'[]').forEach(n=>addRoom('F',n));
+  } catch(e){}
+}
+
+// ── PARTICIPANTS ──
+function addRow(name='', gender='M', save=true) {
+  const tbody = document.getElementById('tbody');
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td class="row-num">${tbody.children.length+1}</td>
+    <td><input type="text" placeholder="이름" value="${name}" oninput="onPChange()"></td>
+    <td><select class="gender-select" onchange="onPChange()">
+      <option value="M" ${gender==='M'?'selected':''}>남 · M</option>
+      <option value="F" ${gender==='F'?'selected':''}>여 · F</option>
+    </select></td>
+    <td><button class="btn-del" onclick="this.closest('tr').remove();renum();onPChange()">✕</button></td>
+  `;
+  tbody.appendChild(tr);
+  if (save) { renum(); onPChange(); }
+}
+function renum() {
+  document.querySelectorAll('#tbody tr').forEach((tr,i)=>tr.querySelector('.row-num').textContent=i+1);
+}
+function onPChange() { saveParticipantsToStorage(); updateStats(); checkRoomWarning(); }
+function clearParticipants() {
+  document.getElementById('tbody').innerHTML='';
+  document.getElementById('results').style.display='none';
+  saveParticipantsToStorage(); updateStats();
+}
+function loadSample() {
+  clearParticipants();
+  [['김정훈','M'],['박성민','M'],['이재원','M'],['최동현','M'],['정우진','M'],['한승호','M'],['서준혁','M'],
+   ['이수진','F'],['박미래','F'],['김지은','F'],['조현아','F'],['윤서연','F'],['강다은','F']]
+  .forEach(([n,g])=>addRow(n,g,false));
+  renum(); onPChange();
+}
+function saveParticipantsToStorage() {
+  try {
+    localStorage.setItem(SK_P, JSON.stringify(
+      [...document.querySelectorAll('#tbody tr')].map(tr=>({
+        name: tr.querySelector('input')?.value?.trim()||'',
+        gender: tr.querySelector('select')?.value||'M'
+      }))
+    ));
+  } catch(e){}
+}
+function loadParticipantsFromStorage() {
+  try {
+    const data = JSON.parse(localStorage.getItem(SK_P)||'[]');
+    if (data.length) { data.forEach(p=>addRow(p.name,p.gender,false)); renum(); }
+    else addRow('','M',false);
+  } catch(e) { addRow('','M',false); }
+}
+
+// ── STATS ──
+function updateStats() {
+  let total=0,m=0,f=0;
+  document.querySelectorAll('#tbody tr').forEach(tr=>{
+    const n=tr.querySelector('input')?.value?.trim(); if(!n) return; total++;
+    tr.querySelector('select')?.value==='M'?m++:f++;
+  });
+  document.getElementById('stat-total').textContent=total;
+  document.getElementById('stat-male').textContent=m;
+  document.getElementById('stat-female').textContent=f;
+  const mR=getRoomNames('M'),fR=getRoomNames('F');
+  document.getElementById('stat-rooms').textContent=(mR.length||Math.ceil(m/2))+(fR.length||Math.ceil(f/2));
+}
+function getPeople() {
+  return [...document.querySelectorAll('#tbody tr')]
+    .map(tr=>({name:tr.querySelector('input')?.value?.trim(),gender:tr.querySelector('select')?.value}))
+    .filter(p=>p.name);
+}
+
+// ── SHUFFLE ──
+function shuffle(arr) {
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+// ── ASSIGN ──
+function assignToRooms(people, roomNames) {
+  const shuffled=shuffle(people), rooms=[];
+  if (!roomNames.length) {
+    for(let i=0;i<shuffled.length;i+=2)
+      rooms.push({name:`ROOM ${String(Math.floor(i/2)+1).padStart(2,'0')}`,members:shuffled.slice(i,i+2),single:i+1>=shuffled.length});
+  } else {
+    const sRooms=shuffle([...roomNames]);
+    for(let i=0;i<sRooms.length;i++){
+      const p1=shuffled[i*2]||null, p2=shuffled[i*2+1]||null;
+      if(!p1) break;
+      rooms.push({name:sRooms[i],members:[p1,...(p2?[p2]:[])],single:!p2});
+    }
+    const extra=shuffled.slice(sRooms.length*2);
+    if(extra.length) rooms.push({name:'미배정',members:extra,single:false,overflow:true});
+  }
+  return rooms;
+}
+
+// ── MATCH ──
+function startMatch() {
+  const all=getPeople();
+  if(all.length<2){alert('참여자를 2명 이상 입력해주세요.');return;}
+
+  const allNames=all.map(p=>p.name);
+  const males=all.filter(p=>p.gender==='M');
+  const females=all.filter(p=>p.gender==='F');
+
+  const grid=document.getElementById('ticker');
+  grid.innerHTML='';
+  const cells=Array.from({length:24},()=>{
+    const c=document.createElement('div');c.className='tc';c.textContent='—';
+    grid.appendChild(c);return c;
+  });
+
+  const overlay=document.getElementById('anim-overlay');
+  const bar=document.getElementById('anim-bar');
+  const bigEl=document.getElementById('anim-big');
+  const msgEl=document.getElementById('anim-msg');
+  const pctEl=document.getElementById('anim-pct');
+  overlay.classList.add('on');
+  playCardAudio();
+
+  const DUR=10000;
+  let scriptIdx=-1;
+
+  function updateScript(idx) {
+    if(idx===scriptIdx) return;
+    scriptIdx=idx;
+    const [big,msg]=ANIM_SCRIPT[idx];
+    bigEl.style.opacity='0'; msgEl.style.opacity='0';
+    setTimeout(()=>{
+      bigEl.innerHTML = big.replace(/\n/g,'<br>');
+      msgEl.innerHTML = msg.replace(/\n/g,'<br>');
+      bigEl.style.opacity='1'; msgEl.style.opacity='1';
+    },200);
+  }
+
+  const start=Date.now();
+  function tick() {
+    const elapsed=Date.now()-start;
+    const prog=Math.min(elapsed/DUR,1);
+    bar.style.width=(prog*100)+'%';
+    pctEl.textContent=Math.round(prog*100)+'%';
+
+    // find script step by weighted offset
+    let step=0;
+    for(let i=SCRIPT_OFFSETS.length-1;i>=0;i--){
+      if(prog>=SCRIPT_OFFSETS[i]){step=i;break;}
+    }
+    updateScript(step);
+
+    if(prog>=1){
+      stopAudio();
+      // 배정 완료 메시지 잠깐 유지 후 커튼 시퀀스
+      setTimeout(()=>{
+        overlay.classList.remove('on');
+        showCurtainThenResults(males, females);
+      }, 1200);
+      return;
+    }
+    cells.forEach(c=>{
+      if(Math.random()<0.14){
+        c.textContent=allNames[Math.floor(Math.random()*allNames.length)];
+        c.classList.add('lit');
+        setTimeout(()=>{c.textContent='—';c.classList.remove('lit');},150+Math.random()*350);
+      }
+    });
+    requestAnimationFrame(tick);
+  }
+  requestAnimationFrame(tick);
+}
+
+// ── CURTAIN REVEAL ──
+function showCurtainThenResults(males, females) {
+  const curtain = document.getElementById('curtain');
+  const left = curtain.querySelector('.curtain-left');
+  const right = curtain.querySelector('.curtain-right');
+  const label = document.getElementById('curtain-label');
+
+  // reset
+  left.style.transition = 'none';
+  right.style.transition = 'none';
+  left.style.transform = 'translateX(-100%)';
+  right.style.transform = 'translateX(100%)';
+  curtain.classList.add('active');
+
+  // 1. 커튼 닫힘 — 처음엔 천천히, 중간에 자연스럽게 흘러들어오는 천 느낌
+  //    ease-in-out with slight overshoot feel (부드러운 벨벳 천)
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      left.style.transition  = 'transform 2.0s cubic-bezier(0.45, 0.05, 0.15, 1.0)';
+      right.style.transition = 'transform 2.0s cubic-bezier(0.45, 0.05, 0.15, 1.0)';
+      left.style.transform  = 'translateX(0)';
+      right.style.transform = 'translateX(0)';
+    });
+  });
+
+  // 2. 닫힌 후 레이블 페이드인 — 2.3s
+  setTimeout(() => { label.classList.add('show'); }, 2300);
+
+  // 3. 결과 준비 (커튼 뒤에서 조용히)
+  setTimeout(() => { showResults(males, females); }, 2500);
+
+  // 4. 레이블 페이드아웃 — 3.8s
+  setTimeout(() => { label.classList.remove('show'); }, 3800);
+
+  // 5. 커튼 열림 — 4.4s, 더 느리고 무겁게. 천이 양쪽으로 당겨지며 흘러가는 느낌
+  setTimeout(() => {
+    left.style.transition  = 'transform 2.2s cubic-bezier(0.6, 0.0, 0.4, 1.0)';
+    right.style.transition = 'transform 2.2s cubic-bezier(0.6, 0.0, 0.4, 1.0)';
+    left.style.transform  = 'translateX(-100%)';
+    right.style.transform = 'translateX(100%)';
+  }, 4400);
+
+  // 6. 커튼 완전히 숨김 — 6.8s
+  setTimeout(() => {
+    curtain.classList.remove('active');
+    left.style.transition = 'none';
+    right.style.transition = 'none';
+  }, 6800);
+}
+
+// ── RESULTS ──
+function showResults(males, females) {
+  const mAssigned=assignToRooms(males,getRoomNames('M'));
+  const fAssigned=assignToRooms(females,getRoomNames('F'));
+
+  const cols=document.getElementById('result-cols');
+  cols.innerHTML='';
+  const mWrap=document.createElement('div');mWrap.className='male-col';
+  mWrap.appendChild(buildCol('남성 숙소',mAssigned,males.length));
+  const fWrap=document.createElement('div');fWrap.className='female-col';
+  fWrap.appendChild(buildCol('여성 숙소',fAssigned,females.length));
+  cols.appendChild(mWrap);cols.appendChild(fWrap);
+
+  const now=new Date();
+  document.getElementById('ts').textContent=
+    `Generated · ${now.getFullYear()}.${String(now.getMonth()+1).padStart(2,'0')}.${String(now.getDate()).padStart(2,'0')}  ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const res=document.getElementById('results');
+  res.style.display='block';
+  setTimeout(()=>res.scrollIntoView({behavior:'smooth'}),100);
+
+  cols.querySelectorAll('.room-item').forEach((el,i)=>{
+    el.style.opacity='0';el.style.transform='translateY(8px)';
+    setTimeout(()=>{el.style.transition='opacity 0.3s ease,transform 0.3s ease';el.style.opacity='1';el.style.transform='translateY(0)';},i*65+200);
+  });
+}
+
+function buildCol(title,rooms,count) {
+  const div=document.createElement('div');div.className='result-col';
+  div.innerHTML=`<div class="rcol-head"><div class="rcol-bar"></div><span class="rcol-label">${title}</span><span class="rcol-count">${count}명</span></div>`;
+  if(!count){const e=document.createElement('div');e.className='empty-msg';e.textContent='참여자 없음';div.appendChild(e);return div;}
+  const grid=document.createElement('div');grid.className='rooms-result-grid';
+  rooms.forEach(room=>{
+    const item=document.createElement('div');item.className='room-item';
+    item.innerHTML=`
+      <div class="room-tag">
+        <span class="room-num-lbl">${room.name}</span>
+        ${room.single?'<span class="single-badge">1인실</span>':''}
+        ${room.overflow?'<span class="overflow-badge">초과</span>':''}
+      </div>
+      ${room.members.map((m,i)=>`<div class="name-entry"><span class="name-idx">${i+1}</span><span class="name-text">${m.name}</span></div>`).join('')}
+    `;
+    grid.appendChild(item);
+  });
+  div.appendChild(grid);
+  return div;
+}
+
+// ── AUDIO ──
+let audioCtx = null;
+let audioNodes = [];
+let audioStopped = false;
+
+function getAudioCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function stopAudio() {
+  audioStopped = true;
+  audioNodes.forEach(n => { try { n.stop(0); } catch(e){} });
+  audioNodes = [];
+}
+
+function playCardAudio() {
+  audioStopped = false;
+  const ac = getAudioCtx();
+  if (ac.state === 'suspended') ac.resume();
+
+  const masterGain = ac.createGain();
+  masterGain.gain.value = 0.55;
+  masterGain.connect(ac.destination);
+
+  // Single card-flip sound: short filtered noise burst with fast decay
+  function cardFlip(t) {
+    if (audioStopped) return;
+    const bufLen = Math.floor(ac.sampleRate * 0.022);
+    const buf = ac.createBuffer(1, bufLen, ac.sampleRate);
+    const data = buf.getChannelData(0);
+    for (let i = 0; i < bufLen; i++) {
+      // two layers: snap transient + paper body
+      const snap = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.04));
+      const paper = (Math.random() * 2 - 1) * Math.exp(-i / (bufLen * 0.55)) * 0.35;
+      data[i] = snap + paper;
+    }
+
+    const src = ac.createBufferSource();
+    src.buffer = buf;
+
+    // bandpass: center around card-paper frequency range
+    const bp = ac.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 1800 + Math.random() * 600; // slight variation each flip
+    bp.Q.value = 1.2;
+
+    // gentle high-shelf to add crispness
+    const shelf = ac.createBiquadFilter();
+    shelf.type = 'highshelf';
+    shelf.frequency.value = 4000;
+    shelf.gain.value = 3;
+
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.9 + Math.random() * 0.2, t);
+    g.gain.exponentialRampToValueAtTime(0.001, t + 0.022);
+
+    src.connect(bp);
+    bp.connect(shelf);
+    shelf.connect(g);
+    g.connect(masterGain);
+    src.start(t);
+    audioNodes.push(src);
+  }
+
+  // Steady shuffle rhythm — 10 seconds, consistent pace like dealing cards
+  // ~5 cards/sec, slight human timing variation per card
+  const totalDur = 10.5;
+  const baseInterval = 0.19; // ~5 flips/sec
+  let t = ac.currentTime + 0.15;
+  const end = ac.currentTime + totalDur;
+
+  while (t < end) {
+    cardFlip(t);
+    // small human-feel timing jitter (±15ms), NO acceleration
+    t += baseInterval + (Math.random() * 0.03 - 0.015);
+  }
+
+  // Soft final chime at the very end
+  const chimeT = ac.currentTime + 9.6;
+  const osc = ac.createOscillator();
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(1047, chimeT); // C6
+  osc.frequency.setValueAtTime(1319, chimeT + 0.12); // E6
+  osc.frequency.setValueAtTime(1568, chimeT + 0.24); // G6
+  const chimeG = ac.createGain();
+  chimeG.gain.setValueAtTime(0, chimeT);
+  chimeG.gain.linearRampToValueAtTime(0.18, chimeT + 0.03);
+  chimeG.gain.exponentialRampToValueAtTime(0.001, chimeT + 0.9);
+  osc.connect(chimeG);
+  chimeG.connect(ac.destination);
+  osc.start(chimeT);
+  osc.stop(chimeT + 1.0);
+  audioNodes.push(osc);
+}
+
+// ── SAVE IMAGE (fixed) ──
+function saveImg() {
+  const target = document.getElementById('results');
+  const btn = document.getElementById('btn-save');
+  const orig = btn.textContent;
+  btn.textContent = '저장 중...';
+  btn.disabled = true;
+
+  // Temporarily disable transitions/animations for clean capture
+  const style = document.createElement('style');
+  style.id = 'capture-style';
+  style.textContent = '* { transition: none !important; animation: none !important; }';
+  document.head.appendChild(style);
+
+  html2canvas(target, {
+    backgroundColor: '#0D0D0D',
+    scale: 2,
+    useCORS: true,
+    allowTaint: true,
+    logging: false,
+    windowWidth: target.scrollWidth,
+    windowHeight: target.scrollHeight,
+  }).then(canvas => {
+    // Remove temp style
+    const s = document.getElementById('capture-style');
+    if (s) s.remove();
+
+    // Create blob URL for more reliable download
+    canvas.toBlob(blob => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      const d = new Date();
+      a.href = url;
+      a.download = `sapiens2_rooms_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.png`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(()=>URL.revokeObjectURL(url), 1000);
+      btn.textContent = orig;
+      btn.disabled = false;
+    }, 'image/png');
+  }).catch(err => {
+    const s = document.getElementById('capture-style');
+    if (s) s.remove();
+    console.error('html2canvas error:', err);
+    alert('이미지 저장 중 오류가 발생했습니다.\n스크린샷(Print Screen / Cmd+Shift+4)을 이용해주세요.');
+    btn.textContent = orig;
+    btn.disabled = false;
+  });
+}
+</script>
+</body>
+</html>
