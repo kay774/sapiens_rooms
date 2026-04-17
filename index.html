@@ -633,7 +633,7 @@ function startMatch() {
   overlay.classList.add('on');
   playCardAudio();
 
-  const DUR=10000;
+  const DUR=17000;
   let scriptIdx=-1;
 
   function updateScript(idx) {
@@ -829,10 +829,9 @@ function playCardAudio() {
     src.start(t);
   }
 
-  // 10초간 계산기 두드리기
-  // 불규칙한 타이밍 — 실제로 계산하는 것처럼
+  // 17초간 계산기 두드리기
   let t = now + 0.2;
-  const end = now + 9.8;
+  const end = now + 16.8;
   while (t < end) {
     calcClick(t, 0.5 + Math.random() * 0.3);
     // 가끔 연속으로 빠르게 (숫자 여러 개 입력)
