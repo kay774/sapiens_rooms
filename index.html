@@ -422,7 +422,7 @@ function loadDefaultData() {
   renum();
   saveParticipantsToStorage();
 
-  // 호실 — 양쪽 탭 모두
+  // 호실
   document.getElementById('rooms-grid-M').innerHTML = '';
   document.getElementById('rooms-grid-F').innerHTML = '';
   DEFAULT_ROOMS_M.forEach(n => addRoom('M', n));
@@ -450,37 +450,9 @@ function switchRoomTab(g) {
   document.getElementById('tab-f').className = 'room-tab' + (g==='F' ? ' active-f' : '');
 }
 
-// ── ROOM CRUD ──
-function addRoom(g, name='') {
-  const grid = document.getElementById('rooms-grid-'+g);
-  const chip = document.createElement('div');
-  chip.className = 'room-chip';
-  chip.innerHTML = `
-    <span class="room-chip-icon">${g==='M'?'♂':'♀'}</span>
-    <input type="text" placeholder="호실명 (예: 201호)" value="${name}" oninput="saveRoomsToStorage();checkRoomWarning()">
-    <button class="room-chip-del" onclick="this.closest('.room-chip').remove();saveRoomsToStorage();checkRoomWarning()">✕</button>
-  `;
-  grid.appendChild(chip);
-  saveRoomsToStorage();
-  checkRoomWarning();
-}
-
-function resetRooms() {
-  const g = currentRoomTab;
-  if (!confirm(`${g==='M'?'남성':'여성'} 호실을 모두 초기화하시겠습니까?`)) return;
-  document.getElementById('rooms-grid-'+g).innerHTML = '';
-  saveRoomsToStorage();
-  checkRoomWarning();
-  updateStats();
-}
-
-function getRoomNames(g) {
-  return [...document.querySelectorAll('#rooms-grid-'+g+' .room-chip input')]
-    .map(i => i.value.trim()).filter(Boolean);
-}
-
 function checkRoomWarning() {
   const warnEl = document.getElementById('room-warning');
+  if (!warnEl) return;
   const mR = getRoomNames('M'), fR = getRoomNames('F');
   const m = getPeople().filter(p=>p.gender==='M').length;
   const f = getPeople().filter(p=>p.gender==='F').length;
@@ -492,17 +464,54 @@ function checkRoomWarning() {
 }
 
 // ── ROOM STORAGE ──
+
 function saveRoomsToStorage() {
   try {
-    localStorage.setItem(SK_RM, JSON.stringify([...document.querySelectorAll('#rooms-grid-M .room-chip input')].map(i=>i.value.trim())));
-    localStorage.setItem(SK_RF, JSON.stringify([...document.querySelectorAll('#rooms-grid-F .room-chip input')].map(i=>i.value.trim())));
+    const mNames = [...document.querySelectorAll('#rooms-grid-M .room-chip input')].map(i=>i.value.trim()).filter(Boolean);
+    const fNames = [...document.querySelectorAll('#rooms-grid-F .room-chip input')].map(i=>i.value.trim()).filter(Boolean);
+    localStorage.setItem(SK_RM, JSON.stringify(mNames));
+    localStorage.setItem(SK_RF, JSON.stringify(fNames));
   } catch(e){}
 }
+
+function addRoom(g, name='') {
+  // F 그리드가 숨겨져 있어도 DOM에 추가 가능 — display:none은 appendChild 가능
+  const grid = document.getElementById('rooms-grid-'+g);
+  const chip = document.createElement('div');
+  chip.className = 'room-chip';
+  chip.innerHTML = `
+    <span class="room-chip-icon">${g==='M'?'♂':'♀'}</span>
+    <input type="text" placeholder="호실명 (예: 201호)" value="${escHtml(name)}" oninput="onRoomChange()">
+    <button class="room-chip-del" onclick="this.closest('.room-chip').remove();onRoomChange()">✕</button>
+  `;
+  grid.appendChild(chip);
+}
+
+function escHtml(s){ return s.replace(/&/g,'&amp;').replace(/"/g,'&quot;'); }
+
+function onRoomChange() { saveRoomsToStorage(); checkRoomWarning(); }
+
+function getRoomNames(g) {
+  return [...document.querySelectorAll('#rooms-grid-'+g+' .room-chip input')]
+    .map(i=>i.value.trim()).filter(Boolean);
+}
+
 function loadRoomsFromStorage() {
   try {
-    JSON.parse(localStorage.getItem(SK_RM)||'[]').forEach(n=>addRoom('M',n));
-    JSON.parse(localStorage.getItem(SK_RF)||'[]').forEach(n=>addRoom('F',n));
+    const mNames = JSON.parse(localStorage.getItem(SK_RM)||'[]');
+    const fNames = JSON.parse(localStorage.getItem(SK_RF)||'[]');
+    mNames.forEach(n => addRoom('M', n));
+    fNames.forEach(n => addRoom('F', n));
   } catch(e){}
+}
+
+function resetRooms() {
+  const g = currentRoomTab;
+  if (!confirm(`${g==='M'?'남성':'여성'} 호실을 모두 초기화하시겠습니까?`)) return;
+  document.getElementById('rooms-grid-'+g).innerHTML = '';
+  saveRoomsToStorage();
+  checkRoomWarning();
+  updateStats();
 }
 
 // ── PARTICIPANTS ──
